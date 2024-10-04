@@ -105,7 +105,7 @@ else
     PR_URL=$(gh pr create --title "$PR_TITLE" --body "$PR_BODY" --head $FORKOWNER:$BRANCH_NAME | grep -oP '(?<=pulls\/)\d+')
 fi
 
-if [ $MERGE == true ]; then
+if [ "$MERGE" == true ]; then
     # Merge the pull request (against the upstream repository)
     if gh pr merge $PR_URL --merge; then
       echo "Pull request successfully merged."
