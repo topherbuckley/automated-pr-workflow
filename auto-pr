@@ -41,6 +41,10 @@ while [[ $# -gt 0 ]]; do
       PR_TITLE="$2"
       shift 2
       ;;
+    --merge)
+      MERGE=false
+      shift
+      ;;
     --help)
       usage
       ;;
@@ -101,44 +105,46 @@ else
     PR_URL=$(gh pr create --title "$PR_TITLE" --body "$PR_BODY" --head $FORKOWNER:$BRANCH_NAME | grep -oP '(?<=pulls\/)\d+')
 fi
 
-# Merge the pull request (against the upstream repository)
-if gh pr merge $PR_URL --merge; then
-  echo "Pull request successfully merged."
-else
-  PR_LINK=$(gh pr view $PR_URL --json url -q '.url' | tr -d '"')
-  echo "Pull request failed. There are likely merge conflicts. Please resolve them at:"
-  echo "$PR_LINK"
-  exit 1
-fi
+if MERGE=true; then
+    # Merge the pull request (against the upstream repository)
+    if gh pr merge $PR_URL --merge; then
+      echo "Pull request successfully merged."
+    else
+      PR_LINK=$(gh pr view $PR_URL --json url -q '.url' | tr -d '"')
+      echo "Pull request failed. There are likely merge conflicts. Please resolve them at:"
+      echo "$PR_LINK"
+      exit 1
+    fi
 
-# Pull changes into the main branch (from upstream)
-MAIN_BRANCH=$(git remote show $UPSTREAM | awk '/HEAD branch/ {print $NF}')
-git checkout $MAIN_BRANCH
-git pull $UPSTREAM $MAIN_BRANCH
+    # Pull changes into the main branch (from upstream)
+    MAIN_BRANCH=$(git remote show $UPSTREAM | awk '/HEAD branch/ {print $NF}')
+    git checkout $MAIN_BRANCH
+    git pull $UPSTREAM $MAIN_BRANCH
 
-# Confirm and delete the remote branch (from your fork)
-confirm_deletion() {
-  while true; do
-    read -p "Do you wish to delete the $1 branch '$2'? [y/n] " yn
-    case $yn in
-      [Yy]* ) return 0;;
-      [Nn]* ) return 1;;
-      * ) echo "Please answer yes or no.";;
-    esac
-  done
-}
+    # Confirm and delete the remote branch (from your fork)
+    confirm_deletion() {
+      while true; do
+        read -p "Do you wish to delete the $1 branch '$2'? [y/n] " yn
+        case $yn in
+          [Yy]* ) return 0;;
+          [Nn]* ) return 1;;
+          * ) echo "Please answer yes or no.";;
+        esac
+      done
+    }
 
-if confirm_deletion "remote" "$BRANCH_NAME"; then
-  git push $ORIGIN --delete $BRANCH_NAME
-  echo "Remote branch '$BRANCH_NAME' deleted."
-else
-  echo "Remote branch '$BRANCH_NAME' not deleted."
-fi
+    if confirm_deletion "remote" "$BRANCH_NAME"; then
+      git push $ORIGIN --delete $BRANCH_NAME
+      echo "Remote branch '$BRANCH_NAME' deleted."
+    else
+      echo "Remote branch '$BRANCH_NAME' not deleted."
+    fi
 
-# Confirm and delete the local branch
-if confirm_deletion "local" "$BRANCH_NAME"; then
-  git branch -d $BRANCH_NAME
-  echo "Local branch '$BRANCH_NAME' deleted."
-else
-  echo "Local branch '$BRANCH_NAME' not deleted."
+    # Confirm and delete the local branch
+    if confirm_deletion "local" "$BRANCH_NAME"; then
+      git branch -d $BRANCH_NAME
+      echo "Local branch '$BRANCH_NAME' deleted."
+    else
+      echo "Local branch '$BRANCH_NAME' not deleted."
+    fi
 fi
